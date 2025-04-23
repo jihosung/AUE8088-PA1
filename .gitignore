@@ -3,6 +3,9 @@ datasets/*
 wandb/*
 lightning_logs/*
 
+# VSCode workspace
+AUE8088-PA1.code-workspace
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
