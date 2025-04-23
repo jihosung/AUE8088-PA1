@@ -13,6 +13,7 @@ import torch
 
 # Custom packages
 from src.metric import MyAccuracy
+from src.metric import MyF1Score
 import src.config as cfg
 from src.util import show_setting
 

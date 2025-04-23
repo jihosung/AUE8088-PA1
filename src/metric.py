@@ -3,7 +3,27 @@ import torch
 
 # [TODO] Implement this!
 class MyF1Score(Metric):
-    pass
+    def __init__(self):
+        super().__init__() # parent class init
+        self.add_state('tp', default=torch.tensor(0), dist_reduce_fx='sum') # add tp state
+        self.add_state('fp', default=torch.tensor(0), dist_reduce_fx='sum') # add fp state
+        self.add_state('fn', default=torch.tensor(0), dist_reduce_fx='sum') # add fn state
+
+    def update(self, preds, target):
+        preds = torch.argmax(preds, dim=1)
+
+        if preds.shape != target.shape:
+            raise ValueError(f"Shape mismatch: {preds.shape} vs {target.shape}")
+        
+        self.tp += ((preds == 1) & (target == 1)).sum()
+        self.fp += ((preds == 1) & (target == 0)).sum()
+        self.fn += ((preds == 0) & (target == 1)).sum()
+
+    def compute(self):
+        precision = self.tp.float() / (self.tp + self.fp).float().clamp(min=1e-10)
+        recall = self.tp.float() / (self.tp + self.fn).float().clamp(min=1e-10)
+        f1 = 2 * (precision * recall) / (precision + recall + 1e-10)
+        return f1
 
 class MyAccuracy(Metric):
     def __init__(self):
