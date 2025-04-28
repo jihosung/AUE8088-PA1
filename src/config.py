@@ -35,7 +35,7 @@ IMAGE_MEAN          = [0.4802, 0.4481, 0.3975]
 IMAGE_STD           = [0.2302, 0.2265, 0.2262]
 
 # Network
-MODEL_NAME          = 'resnet18'
+MODEL_NAME          = 'resnet34'
 
 # Compute related
 ACCELERATOR         = 'gpu'
