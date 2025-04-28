@@ -2,14 +2,23 @@ import os
 
 # Training Hyperparameters
 NUM_CLASSES         = 200
-BATCH_SIZE          = 512
+BATCH_SIZE          = 1024
 VAL_EVERY_N_EPOCH   = 1
 
 NUM_EPOCHS          = 40
 
-OPTIMIZER_PARAMS    = {'type': 'SGD', 'lr': 0.005*5, 'momentum': 0.9}
-# Todo
-# change OPTIMIZER_PARAMS with Adam type
+# original SGD
+# OPTIMIZER_PARAMS    = {'type': 'SGD', 'lr': 0.005*5, 'momentum': 0.9}
+
+# Adam
+OPTIMIZER_PARAMS = {
+    'type': 'Adam',
+    'lr': 0.001*2,
+    'betas': (0.9, 0.999),
+    'eps': 1e-8,
+    'weight_decay': 1e-4  # overfit 방지용 / 기본값 0, 보통 1e-4정도 사용 
+}
+
 
 SCHEDULER_PARAMS    = {'type': 'MultiStepLR', 'milestones': [30, 35], 'gamma': 0.2}
 
