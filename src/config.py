@@ -16,11 +16,17 @@ OPTIMIZER_PARAMS = {
     'lr': 0.001*2,
     'betas': (0.9, 0.999),
     'eps': 1e-8,
-    'weight_decay': 1e-4  # overfit 방지용 / 기본값 0, 보통 1e-4정도 사용 
+    'weight_decay': 2e-4  # overfit 방지용 / 기본값 0, 보통 1e-4정도 사용 
 }
 
+# original Scheduler
+# SCHEDULER_PARAMS    = {'type': 'MultiStepLR', 'milestones': [30, 35], 'gamma': 0.2}
 
-SCHEDULER_PARAMS    = {'type': 'MultiStepLR', 'milestones': [30, 35], 'gamma': 0.2}
+# CosineAnnealingLR
+SCHEDULER_PARAMS = {
+    'type': 'CosineAnnealingLR',
+    'T_max': 200  # 전체 epoch 수
+}
 
 # Dataset
 DATASET_ROOT_PATH   = 'datasets/'
@@ -40,7 +46,7 @@ MODEL_NAME          = 'resnet34'
 # Compute related
 ACCELERATOR         = 'gpu'
 DEVICES             = [0]
-PRECISION_STR       = '32-true'
+PRECISION_STR       = '16-mixed' # 32-fixed -> 16-mixed
 
 # Logging
 WANDB_PROJECT       = 'aue8088-pa1'
