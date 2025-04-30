@@ -2,7 +2,7 @@ import os
 
 # Training Hyperparameters
 NUM_CLASSES         = 200
-BATCH_SIZE          = 1024
+BATCH_SIZE          = 512
 VAL_EVERY_N_EPOCH   = 1
 
 NUM_EPOCHS          = 40
