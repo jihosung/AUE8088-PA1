@@ -1,32 +1,30 @@
+# config.py (수정)
 import os
 
 # Training Hyperparameters
 NUM_CLASSES         = 200
-BATCH_SIZE          = 512 # batch size original 512
+BATCH_SIZE          = 512
 VAL_EVERY_N_EPOCH   = 1
-
 NUM_EPOCHS          = 40
 
-# original SGD
+# 기본 Optimizer (SGD)
 OPTIMIZER_PARAMS    = {'type': 'SGD', 'lr': 0.005, 'momentum': 0.9}
 
-# Adam
-# OPTIMIZER_PARAMS = {
-#     'type': 'Adam',
-#     'lr': 0.001*2,
-#     'betas': (0.9, 0.999),
-#     'eps': 1e-8,
-#     'weight_decay': 2e-4  # overfit 방지용 / 기본값 0, 보통 1e-4정도 사용 
-# }
-
-# original Scheduler
+# 기본 Scheduler (MultiStepLR)
 SCHEDULER_PARAMS    = {'type': 'MultiStepLR', 'milestones': [30, 35], 'gamma': 0.2}
 
-# CosineAnnealingLR
-# SCHEDULER_PARAMS = {
-#     'type': 'CosineAnnealingLR',
-#     'T_max': 40  # 전체 epoch 수
-# }
+# <실험용 하이퍼파라미터 리스트>
+# 1) learning rate 비교 (기본 0.005 외에 0.01, 0.05)
+LR_LIST = [0.005, 0.01, 0.05]
+
+# 2) momentum 비교 (기본 0.9 외에 0.1, 1.5)
+MOMENTUM_LIST = [0.9, 0.1, 1.5]
+
+# 3) scheduler milestones 비교 ([30,35], [20,30], gamma는 그대로 0.2)
+SCHEDULER_LIST = [
+    {'type': 'MultiStepLR', 'milestones': [30, 35], 'gamma': 0.2},
+    {'type': 'MultiStepLR', 'milestones': [20, 30], 'gamma': 0.2},
+]
 
 # Dataset
 DATASET_ROOT_PATH   = 'datasets/'
@@ -53,5 +51,3 @@ WANDB_PROJECT       = 'aue8088-pa1'
 WANDB_ENTITY        = os.environ.get('WANDB_ENTITY')
 WANDB_SAVE_DIR      = 'wandb/'
 WANDB_IMG_LOG_FREQ  = 50
-WANDB_NAME          = f'{MODEL_NAME}-B{BATCH_SIZE}-{OPTIMIZER_PARAMS["type"]}'
-WANDB_NAME         += f'-{SCHEDULER_PARAMS["type"]}{OPTIMIZER_PARAMS["lr"]:.1E}'
