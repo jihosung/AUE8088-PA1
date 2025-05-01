@@ -31,6 +31,7 @@ def run_experiment(optimizer_params, scheduler_params, run_name):
         save_dir = cfg.WANDB_SAVE_DIR,
         entity = cfg.WANDB_ENTITY,
         name = run_name,
+        group    = "sweep_hParams",
     )
     # ⚠️ 실제 사용된 값들을 wandb에 업데이트
     wandb_logger.experiment.config.update({

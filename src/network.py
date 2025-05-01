@@ -20,16 +20,12 @@ import src.config as cfg
 from src.util import show_setting
 
 
-# [TODO: Optional] Rewrite this class if you want
 class MyNetwork(AlexNet):
     def __init__(self):
         super().__init__()
-
-        # [TODO] Modify feature extractor part in AlexNet
-
+        # [TODO] Modify feature extractor part in AlexNet if needed
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # [TODO: Optional] Modify this as well if you want
         x = self.features(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
@@ -38,12 +34,13 @@ class MyNetwork(AlexNet):
 
 
 class SimpleClassifier(LightningModule):
-    def __init__(self,
-                 model_name: str = 'resnet18',
-                 num_classes: int = 200,
-                 optimizer_params: Dict = dict(),
-                 scheduler_params: Dict = dict(),
-        ):
+    def __init__(
+        self,
+        model_name: str = 'resnet18',
+        num_classes: int = 200,
+        optimizer_params: Dict = dict(),
+        scheduler_params: Dict = dict(),
+    ):
         super().__init__()
 
         # Network
@@ -51,18 +48,29 @@ class SimpleClassifier(LightningModule):
             self.model = MyNetwork()
         else:
             models_list = models.list_models()
-            assert model_name in models_list, f'Unknown model name: {model_name}. Choose one from {", ".join(models_list)}'
+            assert model_name in models_list, (
+                f'Unknown model name: {model_name}. Choose one from {", ".join(models_list)}'
+            )
             self.model = models.get_model(model_name, num_classes=num_classes)
 
         # Loss function
         self.loss_fn = nn.CrossEntropyLoss()
 
-        # Metric
-        self.accuracy = MyAccuracy()
-        self.f1score = MyF1Score()
+        # Metrics: separate instances for train and val
+        self.train_f1 = MyF1Score(num_classes=num_classes)
+        self.val_f1 = MyF1Score(num_classes=num_classes)
+        self.accuracy = MyAccuracy()  # can reuse for both if stateless per-step
+
+        # Buffers for prediction distribution debug
+        self._val_preds = []
+        self._val_targets = []
 
         # Hyperparameters
         self.save_hyperparameters()
+
+        # count # of params
+        total_params = sum(p.numel() for p in self.model.parameters())
+        self.hparams.total_params = total_params
 
     def on_train_start(self):
         show_setting(cfg)
@@ -82,27 +90,105 @@ class SimpleClassifier(LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch)
-        accuracy = self.accuracy(scores, y)
-        f1 = self.f1score(scores, y)
-        self.log_dict({
-            'loss/train': loss,
-            'accuracy/train': accuracy,
-            'f1/train': f1,
-        }, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        acc = self.accuracy(scores, y)
+        self.train_f1.update(scores, y)
+        self.log_dict(
+            {
+                'loss/train': loss,
+                'accuracy/train': acc,
+            },
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True
+        )
         return loss
 
+    def on_train_epoch_end(self):
+        # compute and log train F1
+        train_f1_val = self.train_f1.compute()
+        self.log(
+            'f1/train',
+            train_f1_val,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True
+        )
+        # reset for next epoch
+        self.train_f1.reset()
 
     def validation_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch)
-        accuracy = self.accuracy(scores, y)
-        f1 = self.f1score(scores, y)
-        self.log_dict({
-            'loss/val': loss,
-            'accuracy/val': accuracy,
-            'f1/val': f1,
-        }, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        acc = self.accuracy(scores, y)
+        self.val_f1.update(scores, y)
+
+        preds = torch.argmax(scores, dim=1)
+        self._val_preds.append(preds.cpu())
+        self._val_targets.append(y.cpu())
+
+        self.log_dict(
+            {
+                'loss/val': loss,
+                'accuracy/val': acc,
+            },
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True
+        )
         self._wandb_log_image(batch, batch_idx, scores, frequency=cfg.WANDB_IMG_LOG_FREQ)
 
+    def on_validation_epoch_start(self):
+        self._val_preds = []
+        self._val_targets = []
+        # reset F1 metric state
+        self.val_f1.reset()
+
+    def on_validation_epoch_end(self):
+        val_f1_val = self.val_f1.compute()
+        # log overall epoch-level validation F1 for Lightning and ModelCheckpoint
+        self.log(
+            'f1/val',
+            val_f1_val,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True
+        )
+
+        # save per-class F1 to CSV
+        if isinstance(self.logger, WandbLogger):
+            run_name = self.logger.experiment.name
+            save_dir = os.path.join("f1_logs", run_name)
+            os.makedirs(save_dir, exist_ok=True)
+
+            f1_values = self.val_f1.f1_per_class.cpu().numpy()
+            df = pd.DataFrame({'class': list(range(self.val_f1.num_classes)), 'f1_score': f1_values})
+            df.to_csv(
+                os.path.join(save_dir, f'f1_scores_epoch_{self.current_epoch:03d}.csv'),
+                index=False
+            )
+
+            # log top-5 / bottom-5 classes via Lightning
+            topk = torch.topk(self.val_f1.f1_per_class, 5)
+            bottomk = torch.topk(-self.val_f1.f1_per_class, 5)
+            top_dict = {f'f1/top_class_{i}': f1_values[idx] for i, idx in enumerate(topk.indices)}
+            bottom_dict = {f'f1/bottom_class_{i}': f1_values[idx] for i, idx in enumerate(bottomk.indices)}
+            self.log_dict({**top_dict, **bottom_dict}, on_step=False, on_epoch=True, logger=True)
+
+        # debug: print prediction vs target distribution
+        all_preds = torch.cat(self._val_preds)
+        unique_preds, counts = torch.unique(all_preds, return_counts=True)
+        print("\n[Validation Prediction Distribution]")
+        for cls, cnt in zip(unique_preds.tolist(), counts.tolist()):
+            print(f"Class {cls:3d}: {cnt} times")
+
+        all_targets = torch.cat(self._val_targets)
+        unique_targets, tcounts = torch.unique(all_targets, return_counts=True)
+        print("\n[Validation Target Distribution]")
+        for cls, cnt in zip(unique_targets.tolist(), tcounts.tolist()):
+            print(f"Class {cls:3d}: {cnt} times")
 
     def _common_step(self, batch):
         x, y = batch
@@ -110,7 +196,7 @@ class SimpleClassifier(LightningModule):
         loss = self.loss_fn(scores, y)
         return loss, scores, y
 
-    def _wandb_log_image(self, batch, batch_idx, preds, frequency = 100):
+    def _wandb_log_image(self, batch, batch_idx, preds, frequency=100):
         if not isinstance(self.logger, WandbLogger):
             if batch_idx == 0:
                 self.print(colored("Please use WandbLogger to log images.", color='blue', attrs=('bold',)))
@@ -122,35 +208,5 @@ class SimpleClassifier(LightningModule):
             self.logger.log_image(
                 key=f'pred/val/batch{batch_idx:5d}_sample_0',
                 images=[x[0].to('cpu')],
-                caption=[f'GT: {y[0].item()}, Pred: {preds[0].item()}'])
-
-    def on_validation_epoch_end(self):
-        # check valid state
-        if not (hasattr(self.f1score, 'f1_per_class') and isinstance(self.logger, WandbLogger)):
-            return
-
-        # 1. 저장 디렉토리 생성 (wandb run 이름 기반)
-        run_name = self.logger.experiment.name  # wandb run 이름
-        save_dir = os.path.join("f1_logs", run_name)
-        os.makedirs(save_dir, exist_ok=True)
-
-        # 2. per-class F1 가져오기 & 저장
-        f1_values = self.f1score.f1_per_class.cpu().numpy()
-        df = pd.DataFrame({
-            'class': list(range(self.f1score.num_classes)),
-            'f1_score': f1_values
-        })
-        df.to_csv(os.path.join(save_dir, f'f1_scores_epoch_{self.current_epoch:03d}.csv'), index=False)
-
-        # 3. Top-5 / Bottom-5 클래스 WandB에 로그
-        topk = torch.topk(self.f1score.f1_per_class, 5)
-        bottomk = torch.topk(-self.f1score.f1_per_class, 5)
-
-        log_dict = {
-            f'f1/top_class_{i}': f1_values[idx] for i, idx in enumerate(topk.indices)
-        } | {
-            f'f1/bottom_class_{i}': f1_values[idx] for i, idx in enumerate(bottomk.indices)
-        } | {
-            'epoch': self.current_epoch
-        }
-        self.logger.experiment.log(log_dict)
+                caption=[f'GT: {y[0].item()}, Pred: {preds[0].item()}']
+            )
