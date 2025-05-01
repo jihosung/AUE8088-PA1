@@ -46,7 +46,7 @@ if __name__ == "__main__":
         logger = wandb_logger,
         callbacks = [
             LearningRateMonitor(logging_interval='epoch'),
-            ModelCheckpoint(save_top_k=1, monitor='accuracy/val', mode='max'),
+            ModelCheckpoint(save_top_k=1, monitor='f1/val', mode='max'),
         ],
     )
 

@@ -2,6 +2,7 @@
 datasets/*
 wandb/*
 lightning_logs/*
+f1_logs/*
 
 # VSCode workspace
 AUE8088-PA1.code-workspace

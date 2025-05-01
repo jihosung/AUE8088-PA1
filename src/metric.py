@@ -3,27 +3,30 @@ import torch
 
 # [TODO] Implement this!
 class MyF1Score(Metric):
-    def __init__(self):
-        super().__init__() # parent class init
-        self.add_state('tp', default=torch.tensor(0), dist_reduce_fx='sum') # add tp state
-        self.add_state('fp', default=torch.tensor(0), dist_reduce_fx='sum') # add fp state
-        self.add_state('fn', default=torch.tensor(0), dist_reduce_fx='sum') # add fn state
+    def __init__(self, num_classes=200):
+        super().__init__()
+        self.num_classes = num_classes
+        self.add_state('tp', default=torch.zeros(num_classes), dist_reduce_fx='sum')
+        self.add_state('fp', default=torch.zeros(num_classes), dist_reduce_fx='sum')
+        self.add_state('fn', default=torch.zeros(num_classes), dist_reduce_fx='sum')
+        self.f1_per_class = None
 
     def update(self, preds, target):
         preds = torch.argmax(preds, dim=1)
-
-        if preds.shape != target.shape:
-            raise ValueError(f"Shape mismatch: {preds.shape} vs {target.shape}")
-        
-        self.tp += ((preds == 1) & (target == 1)).sum()
-        self.fp += ((preds == 1) & (target == 0)).sum()
-        self.fn += ((preds == 0) & (target == 1)).sum()
+        for c in range(self.num_classes):
+            pred_c = preds == c
+            target_c = target == c
+            self.tp[c] += (pred_c & target_c).sum()
+            self.fp[c] += (pred_c & ~target_c).sum()
+            self.fn[c] += (~pred_c & target_c).sum()
 
     def compute(self):
-        precision = self.tp.float() / (self.tp + self.fp).float().clamp(min=1e-10)
-        recall = self.tp.float() / (self.tp + self.fn).float().clamp(min=1e-10)
-        f1 = 2 * (precision * recall) / (precision + recall + 1e-10)
-        return f1
+        precision = self.tp / (self.tp + self.fp).clamp(min=1e-10)
+        recall = self.tp / (self.tp + self.fn).clamp(min=1e-10)
+        f1 = 2 * precision * recall / (precision + recall + 1e-10)
+        self.f1_per_class = f1.detach().cpu()
+        return f1.mean()
+
 
 class MyAccuracy(Metric):
     def __init__(self):
