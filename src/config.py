@@ -1,30 +1,27 @@
-# config.py (수정)
+# config.py
 import os
 
 # Training Hyperparameters
 NUM_CLASSES         = 200
-BATCH_SIZE          = 512
+BATCH_SIZE          = 256
 VAL_EVERY_N_EPOCH   = 1
 NUM_EPOCHS          = 40
 
-# 기본 Optimizer (SGD)
-OPTIMIZER_PARAMS    = {'type': 'SGD', 'lr': 0.005, 'momentum': 0.9}
+# 기본 Optimizer (Adam)
+OPTIMIZER_PARAMS = {
+    'type': 'Adam',
+    'lr': 0.001,
+    'betas': (0.9, 0.999),
+    'eps': 1e-8,
+    'weight_decay': 1e-4,
+}
 
-# 기본 Scheduler (MultiStepLR)
-SCHEDULER_PARAMS    = {'type': 'MultiStepLR', 'milestones': [30, 35], 'gamma': 0.2}
-
-# <실험용 하이퍼파라미터 리스트>
-# 1) learning rate 비교 (기본 0.005 외에 0.01, 0.05)
-LR_LIST = [0.005, 0.01, 0.05]
-
-# 2) momentum 비교 (기본 0.9 외에 0.1, 1.5)
-MOMENTUM_LIST = [0.9, 0.1, 1.5]
-
-# 3) scheduler milestones 비교 ([30,35], [20,30], gamma는 그대로 0.2)
-SCHEDULER_LIST = [
-    {'type': 'MultiStepLR', 'milestones': [30, 35], 'gamma': 0.2},
-    {'type': 'MultiStepLR', 'milestones': [20, 30], 'gamma': 0.2},
-]
+# 기본 Scheduler (CosineAnnealingLR)
+SCHEDULER_PARAMS = {
+    'type': 'CosineAnnealingLR',
+    'T_max': NUM_EPOCHS,
+    'eta_min': 1e-6,
+}
 
 # Dataset
 DATASET_ROOT_PATH   = 'datasets/'
@@ -38,8 +35,21 @@ IMAGE_PAD_CROPS     = 4
 IMAGE_MEAN          = [0.4802, 0.4481, 0.3975]
 IMAGE_STD           = [0.2302, 0.2265, 0.2262]
 
-# Network
-MODEL_NAME          = 'resnet18'
+# Network: 모델 목록
+MODEL_LIST = [
+    'resnet18',
+    'resnet34',
+    'resnet50',
+    'resnet101',
+    'efficientnet_b0',
+    'efficientnet_b1',
+    'efficientnet_b2',
+    'efficientnet_b3',
+    'efficientnet_b4',
+    'efficientnet_b5',
+    'efficientnet_b6',
+    'efficientnet_b7',
+]
 
 # Compute related
 ACCELERATOR         = 'gpu'

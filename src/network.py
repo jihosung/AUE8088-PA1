@@ -64,6 +64,11 @@ class SimpleClassifier(LightningModule):
         # Hyperparameters
         self.save_hyperparameters()
 
+        # count # of params
+        total_params = sum(p.numel() for p in self.model.parameters())
+        self.hparams.total_params = total_params  # wandb config에 자동 포함됨
+
+
     def on_train_start(self):
         show_setting(cfg)
 
