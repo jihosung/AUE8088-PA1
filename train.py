@@ -26,7 +26,7 @@ def run_experiment(model_name, optimizer_params, scheduler_params, run_name):
         save_dir = cfg.WANDB_SAVE_DIR,
         entity   = cfg.WANDB_ENTITY,
         name     = run_name,
-        group    = "sweepModel",          # ← 여기
+        group    = "sweepModel",
     )
     wandb_logger.experiment.config.update({
         'model_name': model_name,
