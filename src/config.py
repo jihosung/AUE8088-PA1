@@ -46,7 +46,7 @@ MODEL_NAME          = 'resnet18'
 # Compute related
 ACCELERATOR         = 'gpu'
 DEVICES             = [0]
-PRECISION_STR       = '32-fixed'
+PRECISION_STR       = '32-true'
 
 # Logging
 WANDB_PROJECT       = 'aue8088-pa1'
