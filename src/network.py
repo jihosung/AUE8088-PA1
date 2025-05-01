@@ -56,9 +56,10 @@ class SimpleClassifier(LightningModule):
         # Loss function
         self.loss_fn = nn.CrossEntropyLoss()
 
-        # Metrics
-        self.accuracy = MyAccuracy()
-        self.f1score = MyF1Score(num_classes=num_classes)
+        # Metrics: separate instances for train and val
+        self.train_f1 = MyF1Score(num_classes=num_classes)
+        self.val_f1 = MyF1Score(num_classes=num_classes)
+        self.accuracy = MyAccuracy()  # can reuse for both if stateless per-step
 
         # Buffers for prediction distribution debug
         self._val_preds = []
@@ -90,7 +91,7 @@ class SimpleClassifier(LightningModule):
     def training_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch)
         acc = self.accuracy(scores, y)
-        self.f1score.update(scores, y)
+        self.train_f1.update(scores, y)
         self.log_dict(
             {
                 'loss/train': loss,
@@ -104,22 +105,23 @@ class SimpleClassifier(LightningModule):
         return loss
 
     def on_train_epoch_end(self):
-        train_f1 = self.f1score.compute()
+        # compute and log train F1
+        train_f1_val = self.train_f1.compute()
         self.log(
             'f1/train',
-            train_f1,
+            train_f1_val,
             on_step=False,
             on_epoch=True,
             prog_bar=True,
             logger=True
         )
         # reset for next epoch
-        self.f1score.reset()
+        self.train_f1.reset()
 
     def validation_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch)
         acc = self.accuracy(scores, y)
-        self.f1score.update(scores, y)
+        self.val_f1.update(scores, y)
 
         preds = torch.argmax(scores, dim=1)
         self._val_preds.append(preds.cpu())
@@ -141,14 +143,14 @@ class SimpleClassifier(LightningModule):
         self._val_preds = []
         self._val_targets = []
         # reset F1 metric state
-        self.f1score.reset()
+        self.val_f1.reset()
 
     def on_validation_epoch_end(self):
-        val_f1 = self.f1score.compute()
+        val_f1_val = self.val_f1.compute()
         # log overall epoch-level validation F1 for Lightning and ModelCheckpoint
         self.log(
             'f1/val',
-            val_f1,
+            val_f1_val,
             on_step=False,
             on_epoch=True,
             prog_bar=True,
@@ -161,16 +163,16 @@ class SimpleClassifier(LightningModule):
             save_dir = os.path.join("f1_logs", run_name)
             os.makedirs(save_dir, exist_ok=True)
 
-            f1_values = self.f1score.f1_per_class.cpu().numpy()
-            df = pd.DataFrame({'class': list(range(self.f1score.num_classes)), 'f1_score': f1_values})
+            f1_values = self.val_f1.f1_per_class.cpu().numpy()
+            df = pd.DataFrame({'class': list(range(self.val_f1.num_classes)), 'f1_score': f1_values})
             df.to_csv(
                 os.path.join(save_dir, f'f1_scores_epoch_{self.current_epoch:03d}.csv'),
                 index=False
             )
 
             # log top-5 / bottom-5 classes via Lightning
-            topk = torch.topk(self.f1score.f1_per_class, 5)
-            bottomk = torch.topk(-self.f1score.f1_per_class, 5)
+            topk = torch.topk(self.val_f1.f1_per_class, 5)
+            bottomk = torch.topk(-self.val_f1.f1_per_class, 5)
             top_dict = {f'f1/top_class_{i}': f1_values[idx] for i, idx in enumerate(topk.indices)}
             bottom_dict = {f'f1/bottom_class_{i}': f1_values[idx] for i, idx in enumerate(bottomk.indices)}
             self.log_dict({**top_dict, **bottom_dict}, on_step=False, on_epoch=True, logger=True)
