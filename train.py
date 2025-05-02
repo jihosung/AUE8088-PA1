@@ -34,7 +34,8 @@ if __name__ == "__main__":
         project = cfg.WANDB_PROJECT,
         save_dir = cfg.WANDB_SAVE_DIR,
         entity = cfg.WANDB_ENTITY,
-        name = cfg.WANDB_NAME,
+        name = "resnet18-customAlexNet",
+        group = "customAlexNet",
     )
 
     trainer = Trainer(

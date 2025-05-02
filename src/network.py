@@ -21,9 +21,42 @@ from src.util import show_setting
 
 
 class MyNetwork(AlexNet):
-    def __init__(self):
+    def __init__(self, num_classes: int = 200, dropout: float = 0.5) -> None:
         super().__init__()
         # [TODO] Modify feature extractor part in AlexNet if needed
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=5, stride=1, padding=2), # kernel_size 11 -> 5, stride 4 -> 1
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+
+            nn.Conv2d(64, 192, kernel_size=3, padding=2), # kernel_size 5 -> 3
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+
+            nn.Conv2d(192, 384, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(384, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        )
+
+        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(256 * 6 * 6, 4096),
+            nn.ReLU(inplace=True),
+
+            nn.Dropout(p=dropout),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+
+            nn.Linear(4096, num_classes),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)
@@ -71,6 +104,9 @@ class SimpleClassifier(LightningModule):
         # count # of params
         total_params = sum(p.numel() for p in self.model.parameters())
         self.hparams.total_params = total_params
+
+    def on_fit_start(self):
+        self.logger.experiment.log({'total_params': self.hparams.total_params})
 
     def on_train_start(self):
         show_setting(cfg)
