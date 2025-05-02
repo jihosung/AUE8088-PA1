@@ -139,6 +139,9 @@ class SimpleClassifier(LightningModule):
         )
         self._wandb_log_image(batch, batch_idx, scores, frequency=cfg.WANDB_IMG_LOG_FREQ)
 
+    def on_fit_start(self):
+        self.logger.experiment.log({'total_params': self.hparams.total_params})
+
     def on_validation_epoch_start(self):
         self._val_preds = []
         self._val_targets = []
