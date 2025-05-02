@@ -75,6 +75,9 @@ class SimpleClassifier(LightningModule):
     def on_train_start(self):
         show_setting(cfg)
 
+    def on_fit_start(self):
+        self.logger.experiment.log({'total_params': self.hparams.total_params})
+
     def configure_optimizers(self):
         optim_params = copy.deepcopy(self.hparams.optimizer_params)
         optim_type = optim_params.pop('type')
